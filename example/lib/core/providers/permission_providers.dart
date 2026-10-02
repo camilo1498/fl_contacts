@@ -9,29 +9,6 @@ final permissionStatusProvider =
   return FlContacts.checkPermissionStatus();
 });
 
-/// Bumped whenever the database changes; refreshes dependent lists.
-final databaseVersionProvider =
-    NotifierProvider<DatabaseVersionNotifier, int>(
-  DatabaseVersionNotifier.new,
-);
-
-/// Monotonic refresh counter.
-class DatabaseVersionNotifier extends Notifier<int> {
-  @override
-  int build() => 0;
-
-  /// Bumps the version, refreshing watchers.
-  void bump() => state++;
-}
-
-/// Subscribes once and bumps [databaseVersionProvider] on every change.
-final databaseWatcherProvider = Provider<void>((ref) {
-  final sub = FlContacts.onDatabaseChanged.listen((_) {
-    ref.read(databaseVersionProvider.notifier).bump();
-  });
-  ref.onDispose(sub.cancel);
-});
-
 /// Recent typed change events for the activity feed.
 final contactEventsProvider = StreamProvider<List<ContactChange>>((ref) {
   return FlContacts.onContactChanged;

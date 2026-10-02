@@ -10,6 +10,10 @@ Full demo app for [`fl_contacts`](../README.md) with layered architecture:
   `lib/core/router/app_router.dart` (`dart run build_runner build` to
   regenerate `app_router.g.dart`); stateful shell with Contacts, Groups
   and Tools tabs.
+- **Clean layers per feature** — `application/` (controllers, providers,
+  UI state models), `presentation/` (pages + widgets only), shared
+  `core/widgets` (avatar, section cards, dialogs, buttons) and
+  `core/mixins` (form validators).
 - **Features** — searchable contact list with thumbnails, detail page with
   edit/delete/vCard/system-UI actions, contact creator/editor, group CRUD
   with member picker, and a tools page covering permissions, live change

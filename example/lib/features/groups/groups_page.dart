@@ -1,23 +1,66 @@
 import 'package:fl_contacts/fl_contacts.dart';
-import 'package:fl_contacts_example/core/providers/contacts_providers.dart';
-import 'package:fl_contacts_example/core/providers/permission_providers.dart';
+import 'package:fl_contacts_example/core/widgets/contact_avatar.dart';
+import 'package:fl_contacts_example/core/widgets/dialogs.dart';
+import 'package:fl_contacts_example/core/widgets/empty_state.dart';
+import 'package:fl_contacts_example/features/groups/application/groups_controller.dart';
+import 'package:fl_contacts_example/features/groups/presentation/member_picker_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Group browser with create, rename, delete and member editing.
+/// Group browser delegating every mutation to [GroupsController].
 class GroupsPage extends ConsumerWidget {
   const GroupsPage({super.key});
-
   Future<void> _create(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
+    final name = await _promptName(context, title: 'New group');
+    if (name == null || name.isEmpty || !context.mounted) return;
+    try {
+      await ref.read(groupsControllerProvider.notifier).create(name);
+    } on UnsupportedError catch (e) {
+      if (context.mounted) {
+        showMessage(context, e.message ?? 'Not supported here');
+      }
+    }
+  }
+
+  Future<void> _rename(BuildContext context, WidgetRef ref, Group group) async {
+    final name = await _promptName(
+      context,
+      title: 'Rename group',
+      initial: group.name,
+    );
+    if (name == null || name.isEmpty) return;
+    await ref.read(groupsControllerProvider.notifier).rename(group, name);
+  }
+
+  Future<void> _editMembers(BuildContext context, WidgetRef ref, Group group) async {
+    final controller = ref.read(groupsControllerProvider.notifier);
+    final contacts = await FlContacts.getContacts(withGroups: true);
+    final initial = await controller.memberIds(group.id);
+    if (!context.mounted) return;
+    final picked = await showMemberPicker(
+      context,
+      contacts: contacts,
+      initial: initial,
+    );
+    if (picked == null) return;
+    await controller.setMembers(group, picked);
+  }
+
+  Future<String?> _promptName(BuildContext context, {
+    required String title,
+    String initial = '',
+  }) {
+    final controller = TextEditingController(text: initial);
+    return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('New group'),
+        title: Text(title),
         content: TextField(
           controller: controller,
           autofocus: true,
           decoration: const InputDecoration(hintText: 'Coworkers'),
+          onSubmitted: (_) =>
+              Navigator.pop(context, controller.text.trim()),
         ),
         actions: [
           TextButton(
@@ -25,61 +68,16 @@ class GroupsPage extends ConsumerWidget {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Create'),
+            onPressed: () =>
+                Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
           ),
         ],
       ),
-    );
-    controller.dispose();
-    if (name == null || name.isEmpty) return;
-    try {
-      await FlContacts.insertGroup(Group('', name));
-    } on UnsupportedError catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'Not supported here')),
-        );
-      }
-      return;
-    }
-    ref.invalidate(databaseVersionProvider);
-  }
-
-  Future<void> _members(
-    BuildContext context,
-    WidgetRef ref,
-    Group group,
-  ) async {
-    final contacts = await FlContacts.getContacts(withGroups: true);
-    final initial = {
-      for (final c in contacts)
-        if (c.groups.any((g) => g.id == group.id)) c.id,
-    };
-    if (!context.mounted) return;
-    final picked = await showDialog<Set<String>>(
-      context: context,
-      builder: (context) => _MemberPicker(
-        contacts: contacts,
-        initial: initial,
-      ),
-    );
-    if (picked == null) return;
-    final added = picked.difference(initial).toList();
-    final removed = initial.difference(picked).toList();
-    if (added.isNotEmpty) {
-      await FlContacts.addContactsToGroup(
-        groupId: group.id,
-        contactIds: added,
-      );
-    }
-    if (removed.isNotEmpty) {
-      await FlContacts.removeContactsFromGroup(
-        groupId: group.id,
-        contactIds: removed,
-      );
-    }
-    ref.invalidate(databaseVersionProvider);
+    ).then((name) {
+      controller.dispose();
+      return (name == null || name.isEmpty) ? null : name;
+    });
   }
 
   @override
@@ -94,120 +92,60 @@ class GroupsPage extends ConsumerWidget {
       body: groups.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Load error: $e')),
-        data: (list) => RefreshIndicator(
-          onRefresh: () async => ref.invalidate(groupsProvider),
-          child: ListView.builder(
-            itemCount: list.length,
-            itemBuilder: (context, index) {
-              final group = list[index];
-              return ListTile(
-                leading: const Icon(Icons.label),
-                title: Text(group.name),
-                onTap: () => _members(context, ref, group),
-                trailing: PopupMenuButton<String>(
-                  onSelected: (value) async {
-                    if (value == 'rename') {
-                      final controller =
-                          TextEditingController(text: group.name);
-                      final name = await showDialog<String>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Rename group'),
-                          content: TextField(controller: controller),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel'),
-                            ),
-                            FilledButton(
-                              onPressed: () => Navigator.pop(
-                                context,
-                                controller.text.trim(),
-                              ),
-                              child: const Text('Save'),
-                            ),
-                          ],
-                        ),
-                      );
-                      controller.dispose();
-                      if (name == null || name.isEmpty) return;
-                      group.name = name;
-                      await FlContacts.updateGroup(group);
-                      ref.invalidate(databaseVersionProvider);
-                    } else {
-                      await FlContacts.deleteGroup(group);
-                      ref.invalidate(databaseVersionProvider);
-                    }
-                  },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'rename', child: Text('Rename')),
-                    PopupMenuItem(value: 'delete', child: Text('Delete')),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Checkbox list of contacts for group membership editing.
-class _MemberPicker extends StatefulWidget {
-  const _MemberPicker({required this.contacts, required this.initial});
-
-  final List<Contact> contacts;
-  final Set<String> initial;
-
-  @override
-  State<_MemberPicker> createState() => _MemberPickerState();
-}
-
-class _MemberPickerState extends State<_MemberPicker> {
-  late Set<String> _picked;
-
-  @override
-  void initState() {
-    super.initState();
-    _picked = Set.of(widget.initial);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Members'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: ListView.builder(
-          shrinkWrap: true,
-          itemCount: widget.contacts.length,
-          itemBuilder: (context, index) {
-            final contact = widget.contacts[index];
-            return CheckboxListTile(
-              title: Text(contact.displayName),
-              value: _picked.contains(contact.id),
-              onChanged: (v) => setState(() {
-                if (v == true) {
-                  _picked.add(contact.id);
-                } else {
-                  _picked.remove(contact.id);
-                }
-              }),
+        data: (list) {
+          if (list.isEmpty) {
+            return EmptyState(
+              icon: Icons.label_off,
+              title: 'No groups yet',
+              subtitle: 'Create one to organize contacts.',
+              action: FilledButton(
+                onPressed: () => _create(context, ref),
+                child: const Text('Create group'),
+              ),
             );
-          },
-        ),
+          }
+          return RefreshIndicator(
+            onRefresh: () async => ref.invalidate(groupsProvider),
+            child: ListView.builder(
+              itemCount: list.length,
+              itemBuilder: (context, index) {
+                final group = list[index];
+                return ListTile(
+                  leading: ContactAvatar(
+                    displayName: group.name,
+                    radius: 20,
+                  ),
+                  title: Text(group.name),
+                  trailing: PopupMenuButton<String>(
+                    onSelected: (value) async {
+                      if (value == 'rename') {
+                        await _rename(context, ref, group);
+                      } else {
+                        final confirmed = await showConfirmDialog(
+                          context,
+                          title: 'Delete group?',
+                        );
+                        if (confirmed && context.mounted) {
+                          await ref
+                              .read(groupsControllerProvider.notifier)
+                              .delete(group);
+                        }
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                          value: 'rename', child: Text('Rename')),
+                      PopupMenuItem(
+                          value: 'delete', child: Text('Delete')),
+                    ],
+                  ),
+                  onTap: () => _editMembers(context, ref, group),
+                );
+              },
+            ),
+          );
+        },
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _picked),
-          child: const Text('Save'),
-        ),
-      ],
     );
   }
 }

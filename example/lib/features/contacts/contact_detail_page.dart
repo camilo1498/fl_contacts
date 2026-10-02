@@ -1,7 +1,13 @@
 import 'package:fl_contacts/fl_contacts.dart';
-import 'package:fl_contacts_example/core/providers/contacts_providers.dart';
-import 'package:fl_contacts_example/core/providers/permission_providers.dart';
 import 'package:fl_contacts_example/core/router/app_router.dart';
+import 'package:fl_contacts_example/core/widgets/contact_avatar.dart';
+import 'package:fl_contacts_example/core/widgets/contact_header.dart';
+import 'package:fl_contacts_example/core/widgets/dialogs.dart';
+import 'package:fl_contacts_example/core/widgets/empty_state.dart';
+import 'package:fl_contacts_example/core/widgets/property_row.dart';
+import 'package:fl_contacts_example/core/widgets/section_card.dart';
+import 'package:fl_contacts_example/features/contacts/application/contact_detail_controller.dart';
+import 'package:fl_contacts_example/features/contacts/application/contacts_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,124 +19,140 @@ class ContactDetailPage extends ConsumerWidget {
 
   final String contactId;
 
-  Future<void> _delete(BuildContext context, WidgetRef ref) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete contact?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !context.mounted) return;
-    final contact = await ref.read(contactDetailProvider(contactId).future);
-    if (contact == null || !context.mounted) return;
-    await contact.delete();
-    ref.invalidate(databaseVersionProvider);
-    if (context.mounted) context.pop();
-  }
-
-  Future<void> _export(BuildContext context, Contact contact) async {
-    final vcard = contact.toVCard(withPhoto: false);
-    await Clipboard.setData(ClipboardData(text: vcard));
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'vCard copied (${contact.extras.length} extras preserved)',
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final contact = ref.watch(contactDetailProvider(contactId));
+    final controller =
+        ref.watch(contactDetailControllerProvider.notifier);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Contact'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: () => ContactEditorRouteData(id: contactId)
-                .push<bool>(context)
-                .then((_) => ref.invalidate(contactDetailProvider(contactId))),
-          ),
-        ],
-      ),
       body: contact.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Load error: $e')),
         data: (c) {
           if (c == null) {
-            return const Center(child: Text('Contact not found'));
+            return const EmptyState(
+              icon: Icons.person_off,
+              title: 'Contact not found',
+              subtitle: 'It may have been deleted elsewhere.',
+            );
           }
-          return ListView(
-            children: [
-              if (c.photoOrThumbnail != null)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: CircleAvatar(
-                    radius: 48,
-                    backgroundImage: MemoryImage(c.photoOrThumbnail!),
-                  ),
-                ),
-              ListTile(
-                title: Text(
-                  c.displayName,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                subtitle: Text(c.name.nickname.isEmpty
-                    ? ''
-                    : '"${c.name.nickname}"'),
-              ),
-              for (final p in c.phones)
-                ListTile(
-                  leading: const Icon(Icons.phone),
-                  title: Text(p.number),
-                  subtitle: Text(p.label.name),
-                ),
-              for (final e in c.emails)
-                ListTile(
-                  leading: const Icon(Icons.email),
-                  title: Text(e.address),
-                  subtitle: Text(e.label.name),
-                ),
-              for (final a in c.addresses)
-                ListTile(
-                  leading: const Icon(Icons.home),
-                  title: Text(a.address),
-                  subtitle: Text(a.label.name),
-                ),
-              const Divider(),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilledButton.tonal(
-                    onPressed: () => _export(context, c),
-                    child: const Text('Copy vCard'),
-                  ),
-                  FilledButton.tonal(
+          return CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                pinned: true,
+                expandedHeight: 220,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.edit),
                     onPressed: () =>
-                        FlContacts.openExternalView(c.id),
-                    child: const Text('System view'),
+                        ContactEditorRouteData(id: contactId).push(context),
                   ),
-                  FilledButton.tonal(
-                    onPressed: () => FlContacts.openExternalEdit(c.id),
-                    child: const Text('System edit'),
-                  ),
-                  FilledButton.tonal(
-                    onPressed: () => _delete(context, ref),
-                    child: const Text('Delete'),
+                ],
+                flexibleSpace: FlexibleSpaceBar(
+                  background: ContactHeader(contact: c),
+                ),
+              ),
+              SliverList.list(
+                children: [
+                  if (c.photoOrThumbnail != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: Row(
+                        children: [
+                          ContactAvatar.fromContact(c, radius: 28),
+                          const SizedBox(width: 12),
+                          const Text('Synced photo'),
+                        ],
+                      ),
+                    ),
+                  if (c.phones.isNotEmpty)
+                    SectionCard(
+                      title: 'Phones',
+                      children: [
+                        for (final p in c.phones)
+                          PropertyRow(
+                            icon: Icons.phone,
+                            title: p.number,
+                            label: p.label == PhoneLabel.custom
+                                ? p.customLabel
+                                : p.label.name,
+                          ),
+                      ],
+                    ),
+                  if (c.emails.isNotEmpty)
+                    SectionCard(
+                      title: 'Emails',
+                      children: [
+                        for (final e in c.emails)
+                          PropertyRow(
+                            icon: Icons.email,
+                            title: e.address,
+                            label: e.label == EmailLabel.custom
+                                ? e.customLabel
+                                : e.label.name,
+                          ),
+                      ],
+                    ),
+                  if (c.addresses.isNotEmpty)
+                    SectionCard(
+                      title: 'Addresses',
+                      children: [
+                        for (final a in c.addresses)
+                          PropertyRow(
+                            icon: Icons.home,
+                            title: a.address,
+                            label: a.label.name,
+                          ),
+                      ],
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.tonal(
+                          onPressed: () async {
+                            final vcard =
+                                await controller.exportVCard(contactId);
+                            if (vcard == null || !context.mounted) return;
+                            await Clipboard.setData(
+                              ClipboardData(text: vcard),
+                            );
+                            if (context.mounted) {
+                              showMessage(
+                                context,
+                                'vCard copied '
+                                '(${c.extras.length} extras)',
+                              );
+                            }
+                          },
+                          child: const Text('Copy vCard'),
+                        ),
+                        FilledButton.tonal(
+                          onPressed: () =>
+                              FlContacts.openExternalView(c.id),
+                          child: const Text('System view'),
+                        ),
+                        FilledButton.tonal(
+                          onPressed: () =>
+                              FlContacts.openExternalEdit(c.id),
+                          child: const Text('System edit'),
+                        ),
+                        FilledButton.tonal(
+                          onPressed: () async {
+                            final confirmed = await showConfirmDialog(
+                              context,
+                              title: 'Delete contact?',
+                            );
+                            if (!confirmed || !context.mounted) return;
+                            await controller.delete(contactId);
+                            if (context.mounted) context.pop();
+                          },
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

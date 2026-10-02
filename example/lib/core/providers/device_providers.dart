@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:fl_contacts/fl_contacts.dart';
-import 'package:fl_contacts_example/core/providers/permission_providers.dart';
+import 'package:fl_contacts_example/core/providers/sync_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// SIM contacts (Android only, empty elsewhere).
