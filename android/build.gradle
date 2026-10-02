@@ -1,0 +1,101 @@
+group = 'co.quis.fl_contacts'
+version = '1.0-SNAPSHOT'
+
+// AGP 9 ships Kotlin support built in: the Kotlin Gradle plugin must NOT be
+// applied or the build fails. Compiler options go through the `kotlin`
+// extension below; Flutter >= 3.44 is required for this setup.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath('com.android.tools.build:gradle:9.1.0')
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven {
+            url = 'https://storage.googleapis.com/download.flutter.io'
+        }
+    }
+}
+
+String readFlutterSdk(File dir) {
+    if (dir == null) return null
+    def file = new File(dir, 'local.properties')
+    if (!file.exists()) return null
+    def props = new Properties()
+    file.withReader('UTF-8') { props.load(it) }
+    return props.getProperty('flutter.sdk')
+}
+
+def flutterRoot = project.findProperty('flutter-root')?.toString()
+    ?: project.findProperty('flutter.sdk')?.toString()
+
+if (flutterRoot == null) {
+    flutterRoot = readFlutterSdk(rootProject.projectDir)
+}
+
+if (flutterRoot == null) {
+    def dir = project.projectDir
+    while (dir != null && flutterRoot == null) {
+        flutterRoot = readFlutterSdk(dir)
+        dir = dir.parentFile
+    }
+}
+
+if (flutterRoot == null) {
+    flutterRoot = System.getenv('FLUTTER_ROOT')
+}
+
+if (flutterRoot == null) {
+    throw new GradleException(
+        'Flutter SDK not found. Define flutter.sdk in local.properties, pass -Pflutter.sdk=<path>, or set FLUTTER_ROOT.'
+    )
+}
+
+def engineVersion = new File(flutterRoot, 'bin/cache/engine.stamp').text.trim()
+
+// The embedding is compile-only and pinned to the running engine so IDE sync
+// and standalone builds resolve it reliably.
+
+apply plugin: 'com.android.library'
+
+android {
+    // Unconditional namespace is mandatory since AGP 8.
+    namespace = 'co.quis.fl_contacts'
+    compileSdk = 36
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlin {
+        compilerOptions {
+            jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+        }
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        minSdk = 24
+    }
+
+    lint {
+        disable.add('InvalidPackage')
+    }
+}
+
+dependencies {
+    compileOnly "io.flutter:flutter_embedding_release:1.0.0-${engineVersion}"
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+}

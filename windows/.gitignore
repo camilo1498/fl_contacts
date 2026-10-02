@@ -1,0 +1,5 @@
+# Windows plugin output lands in the root build/ directory (already
+# ignored). Nothing plugin-specific is generated beside it.
+build/
+.vs/
+*.user
