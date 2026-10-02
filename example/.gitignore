@@ -1,5 +1,8 @@
 # Example app generated files (root ignores cover these too).
 .dart_tool/
 build/
+.gradle/
 pubspec.lock
 local.properties
+.flutter-plugins-dependencies
+.flutter-plugins
