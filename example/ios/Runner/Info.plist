@@ -14,8 +14,6 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
-	<key>NSContactsUsageDescription</key>
-	<string>We need access to your contacts to show and manage them.</string>
 	<key>CFBundleName</key>
 	<string>fl_contacts_example</string>
 	<key>CFBundlePackageType</key>
@@ -28,6 +26,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSContactsUsageDescription</key>
+	<string>We need access to your contacts to show and manage them.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
