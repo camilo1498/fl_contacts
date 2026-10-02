@@ -1,7 +1,6 @@
 // vCard 4.0 export fixtures.
 import 'dart:convert';
 
-import 'package:fl_contacts/config.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_contacts/fl_contacts.dart';
 

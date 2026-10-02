@@ -13,6 +13,7 @@ import 'package:fl_contacts/ringtone.dart';
 export 'contact.dart';
 export 'contact_change.dart';
 export 'contact_filter.dart';
+export 'config.dart';
 export 'fl_blocked_numbers.dart';
 export 'fl_ringtones.dart';
 export 'properties/account.dart';
