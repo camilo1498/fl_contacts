@@ -84,7 +84,7 @@ dependencies:
   fl_contacts: ^1.3.0
 ```
 
-**iOS** — add the usage description to your app's `Info.plist`:
+**iOS and macOS** — add the usage description to your app's `Info.plist`:
 
 ```xml
 <plist version="1.0">
@@ -92,6 +92,18 @@ dependencies:
     ...
     <key>NSContactsUsageDescription</key>
     <string>We need access to your contacts to show and manage them.</string>
+</dict>
+</plist>
+```
+
+On macOS the sandboxed Runner additionally needs the address-book
+entitlement in both `DebugProfile.entitlements` and `Release.entitlements`:
+
+```xml
+<dict>
+    ...
+    <key>com.apple.security.personal-information.addressbook</key>
+    <true/>
 </dict>
 </plist>
 ```

@@ -12,7 +12,7 @@ Flutter plugin to read, create, update, delete and observe native contacts on An
   # Shared with Swift Package Manager: same Sources layout, same privacy file.
   s.source_files = 'fl_contacts/Sources/fl_contacts/**/*.swift'
   s.resource_bundles = {'fl_contacts_privacy' => ['fl_contacts/Sources/fl_contacts/PrivacyInfo.xcprivacy']}
-  s.dependency 'Flutter'
+  s.dependency 'FlutterMacOS'
   s.platform = :osx, '10.15'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES', 'EXCLUDED_ARCHS[sdk=macosx*]' => 'i386' }
