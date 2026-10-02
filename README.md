@@ -65,7 +65,7 @@ if (await FlContacts.requestPermission()) {
 |---|---|
 | Flutter | 3.44.0 |
 | Dart | 3.12.0 |
-| Android | minSdk 24 · compileSdk 36 · Java 17 · AGP 9.x (built-in Kotlin) |
+| Android | minSdk 24 · compileSdk 36 · Java 17 · AGP 9.x (built-in Kotlin) · thumbnails downsampled to 192 px natively |
 | iOS | 13.0+ · Xcode 16+ · Swift 5 language mode |
 | macOS | 10.15+ · Xcode 16+ (Contacts framework, no system contact UI) |
 | Windows | Windows 10 1809+ (WinRT contact store) |

@@ -94,8 +94,7 @@ void main() {
     );
   });
 
-  test('desktop-only APIs throw with clear errors', () async {
-    await expectLater(
+  test('desktop-only APIs throw with clear errors', () async {    await expectLater(
       FlContacts.getSimContacts(),
       throwsUnsupportedError,
     );
@@ -107,5 +106,9 @@ void main() {
       FlRingtones.stop(),
       throwsUnsupportedError,
     );
+  });
+
+  test('thumbnails are downsampled by default', () {
+    expect(FlContacts.config.thumbnailMaxSize, 192);
   });
 }

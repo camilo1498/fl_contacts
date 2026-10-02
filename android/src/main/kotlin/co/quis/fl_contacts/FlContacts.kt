@@ -9,6 +9,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.AssetFileDescriptor
 import android.database.Cursor
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.ContactsContract
 import android.provider.ContactsContract.CommonDataKinds.Email
@@ -27,6 +29,7 @@ import android.provider.ContactsContract.Contacts
 import android.provider.ContactsContract.Data
 import android.provider.ContactsContract.Groups
 import android.provider.ContactsContract.RawContacts
+import java.io.ByteArrayOutputStream
 import java.io.FileNotFoundException
 import java.io.InputStream
 import java.io.OutputStream
@@ -66,7 +69,8 @@ class FlContacts {
             includeNonVisible: Boolean,
             idIsRawContactId: Boolean = false,
             filter: Map<String, Any?>? = null,
-            limit: Int? = null
+            limit: Int? = null,
+            thumbnailMaxSize: Int = 0
         ): List<Map<String, Any?>> {
             // Phone/email/group filters need hydrated rows; fetch properties
             // so a single provider round trip still suffices.
@@ -242,7 +246,10 @@ class FlContacts {
                 val mimetype = getString(Data.MIMETYPE)
 
                 if (withThumbnail && mimetype == Photo.CONTENT_ITEM_TYPE) {
-                    contact.thumbnail = cursor.getBlob(col(Photo.PHOTO))
+                    contact.thumbnail = downsampleThumbnail(
+                        cursor.getBlob(col(Photo.PHOTO)),
+                        thumbnailMaxSize
+                    )
                 }
 
                 if (fetchProperties) {
@@ -905,9 +912,52 @@ class FlContacts {
             openExternalPickOrInsert(activity, context, insert, null)
         }
 
+        /** Shrinks a provider thumbnail to [maxSize] px on its longest side.
+         *
+         * Provider blobs are often full-size photos; decoding megabytes per
+         * list row drops frames. Already-small, empty or undecodable blobs
+         * pass through untouched, and the original format is preserved, so
+         * this never fails a fetch. A non-positive [maxSize] disables it. */
+        private fun downsampleThumbnail(bytes: ByteArray?, maxSize: Int): ByteArray? {
+            if (bytes == null || bytes.isEmpty() || maxSize <= 0) return bytes
+            return try {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                val longest = maxOf(bounds.outWidth, bounds.outHeight)
+                if (longest <= 0 || longest <= maxSize) return bytes
+                var sample = 1
+                while (longest / (sample * 2) >= maxSize) sample *= 2
+                val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+                val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                    ?: return bytes
+                val scale = maxSize.toFloat() / maxOf(decoded.width, decoded.height)
+                val scaled = Bitmap.createScaledBitmap(
+                    decoded,
+                    (decoded.width * scale).toInt().coerceAtLeast(1),
+                    (decoded.height * scale).toInt().coerceAtLeast(1),
+                    true
+                )
+                if (scaled !== decoded) decoded.recycle()
+                val out = ByteArrayOutputStream()
+                val png = bytes.size >= 8 &&
+                    bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() &&
+                    bytes[2] == 0x4E.toByte() && bytes[3] == 0x47.toByte()
+                scaled.compress(
+                    if (png) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG,
+                    85,
+                    out
+                )
+                scaled.recycle()
+                out.toByteArray()
+            } catch (e: Exception) {
+                bytes
+            } catch (e: OutOfMemoryError) {
+                bytes
+            }
+        }
+
         /** Fast ID-and-name listing without property joins. */
-        private fun getQuick(resolver: ContentResolver, includeNonVisible: Boolean): List<Map<String, Any?>> {
-            val selection: String? = if (includeNonVisible) null else "${Data.IN_VISIBLE_GROUP} = 1"
+        private fun getQuick(resolver: ContentResolver, includeNonVisible: Boolean): List<Map<String, Any?>> {            val selection: String? = if (includeNonVisible) null else "${Data.IN_VISIBLE_GROUP} = 1"
 
             // Narrow projection: only the three columns this path reads.
             val cursor = resolver.query(

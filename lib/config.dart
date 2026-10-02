@@ -21,6 +21,14 @@ class FlContactsConfig {
 
   /// vCard flavor used by [Contact.toVCard]. v3 is the safest default.
   VCardVersion vCardVersion = VCardVersion.v3;
+
+  /// Longest side in pixels for thumbnails fetched from the native store.
+  ///
+  /// Provider thumbnails are often full-size photos, which makes list
+  /// scrolling janky (per-frame JPEG decodes of megabytes). The native side
+  /// downsamples them once, off the UI thread, preserving the original
+  /// format. Set to 0 to keep the untouched bytes.
+  int thumbnailMaxSize = 192;
 }
 
 /// Shared configuration backing [FlContacts.config].

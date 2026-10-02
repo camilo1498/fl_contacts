@@ -645,6 +645,7 @@ class FlContacts {
           config.includeNotesOnIos13AndAbove,
           filter?.toJson(),
           limit,
+          config.thumbnailMaxSize,
         ]) ??
         [];
     final contacts = untypedContacts

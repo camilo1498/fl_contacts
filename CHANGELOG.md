@@ -1,3 +1,12 @@
+## 1.3.1
+
+* Fix scroll jank on contact lists: provider thumbnail blobs are often
+  full-size photos, decoded per frame. Thumbnails are now downsampled
+  natively (longest side `FlContactsConfig.thumbnailMaxSize`, 192 px by
+  default, format-preserving, with byte-identical fallback) on a
+  background thread before crossing the channel. Set it to 0 to keep the
+  original bytes. Full-resolution `photo` fetches are untouched.
+
 ## 1.3.0
 
 * Renamed package `flutter_contacts` → `fl_contacts`: Dart package and

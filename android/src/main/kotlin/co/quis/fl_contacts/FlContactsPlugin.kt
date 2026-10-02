@@ -315,6 +315,9 @@ class FlContactsPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
                     val filter = args.getOrNull(9) as? Map<String, Any?>
                     val limit = (args.getOrNull(10) as? Int)
                         ?: (args.getOrNull(10) as? Long)?.toInt()
+                    val thumbnailMaxSize = (args.getOrNull(11) as? Int)
+                        ?: (args.getOrNull(11) as? Long)?.toInt()
+                        ?: 0
                     val contacts: List<Map<String, Any?>> =
                         FlContacts.select(
                             resolver!!,
@@ -329,7 +332,8 @@ class FlContactsPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
                             includeNonVisible,
                             false,
                             filter,
-                            limit
+                            limit,
+                            thumbnailMaxSize
                         )
                     withContext(Dispatchers.Main) { result.success(contacts) }
                 }
