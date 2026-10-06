@@ -46,39 +46,23 @@ class GroupsPage extends ConsumerWidget {
     await controller.setMembers(group, picked);
   }
 
-  Future<String?> _promptName(BuildContext context, {
+  Future<String?> _promptName(
+    BuildContext context, {
     required String title,
     String initial = '',
-  }) {
-    final controller = TextEditingController(text: initial);
-    return showDialog<String>(
+  }) async {
+    final name = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Coworkers'),
-          onSubmitted: (_) =>
-              Navigator.pop(context, controller.text.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
+      builder: (context) => _NamePromptDialog(
+        title: title,
+        initial: initial,
       ),
-    ).then((name) {
-      controller.dispose();
-      return (name == null || name.isEmpty) ? null : name;
-    });
+    );
+    return (name == null || name.isEmpty) ? null : name;
   }
+
+  /// Name prompt owning its controller so disposal is framework-ordered.
+  
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -146,6 +130,55 @@ class GroupsPage extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+}
+
+/// Single-field name prompt with framework-managed controller lifecycle.
+class _NamePromptDialog extends StatefulWidget {
+  const _NamePromptDialog({required this.title, this.initial = ''});
+
+  final String title;
+  final String initial;
+
+  @override
+  State<_NamePromptDialog> createState() => _NamePromptDialogState();
+}
+
+class _NamePromptDialogState extends State<_NamePromptDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit(BuildContext context) {
+    Navigator.pop(context, _controller.text.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(hintText: 'Coworkers'),
+        onSubmitted: (_) => _submit(context),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => _submit(context),
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
